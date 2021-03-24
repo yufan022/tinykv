@@ -177,7 +177,7 @@ func newRaft(c *Config) *Raft {
 		electionTimeout:  c.ElectionTick,
 		heartbeatTimeout: c.HeartbeatTick,
 		Prs:              prs,
-		Term:             1,
+		Term:             0,
 		votes:            make(map[uint64]bool),
 		RaftLog:          newLog(c.Storage),
 	}
@@ -201,7 +201,6 @@ func (r *Raft) tick() {
 	switch r.State {
 	case StateLeader:
 		if r.heartbeatElapsed > r.heartbeatTimeout {
-			r.Term++
 			r.becomeCandidate()
 			r.heartbeatElapsed = 0
 
@@ -219,7 +218,6 @@ func (r *Raft) tick() {
 	case StateFollower, StateCandidate:
 		r.electionElapsed++
 		if r.electionElapsed > (r.electionTimeout + rand.Intn(r.electionTimeout)) {
-			r.Term++
 			r.becomeCandidate()
 			r.electionElapsed = 0
 			r.Vote = r.id
@@ -270,20 +268,20 @@ func (r *Raft) becomeFollower(term uint64, lead uint64) {
 	r.State = StateFollower
 	r.Lead = lead
 	r.Term = term
-	//r.Term++
 }
 
 // becomeCandidate transform this peer's state to candidate
 func (r *Raft) becomeCandidate() {
 	// Your Code Here (2A).
-	if r.State != StateCandidate {
-		r.State = StateCandidate
-		r.Vote = None
-		r.votes = map[uint64]bool{}
-		r.votes[r.id] = true
-		r.Lead = None
-		//r.Vote = r.id
-	}
+	//if r.State != StateCandidate {
+	r.State = StateCandidate
+	r.Vote = None
+	r.votes = map[uint64]bool{}
+	r.votes[r.id] = true
+	r.Lead = None
+	r.Term++
+	//r.Vote = r.id
+	//}
 }
 
 // becomeLeader transform this peer's state to leader
@@ -379,7 +377,7 @@ func (r *Raft) Step(m pb.Message) error {
 			} else {
 				flag = true
 			}
-			r.becomeFollower(r.Term+1, m.From)
+			r.becomeFollower(m.Term, m.From)
 			//if len(r.votes) >= (len(r.Prs)+1)/2+1 {
 			//	r.becomeLeader()
 			r.msgs = []pb.Message{
@@ -387,7 +385,7 @@ func (r *Raft) Step(m pb.Message) error {
 			}
 			//}
 		case pb.MessageType_MsgHeartbeat:
-			r.becomeFollower(m.Term+1, m.From)
+			r.becomeFollower(m.Term, m.From)
 			//case pb.MessageType_MsgAppend:
 			//	r.becomeFollower(m.Term+1, m.From)
 		}
@@ -424,12 +422,27 @@ func (r *Raft) Step(m pb.Message) error {
 					//reject = false
 				}
 			}
-			r.Term++
 			r.msgs = []pb.Message{
 				{From: r.id, To: m.From, Term: r.Term, MsgType: pb.MessageType_MsgRequestVoteResponse, Reject: reject},
 			}
-			r.becomeFollower(r.Term, m.From)
-
+			if !reject {
+				term := m.Term
+				if r.Term > m.Term {
+					term = r.Term
+				}
+				r.becomeFollower(term, m.From)
+			}
+		case pb.MessageType_MsgBeat:
+			for peer, _ := range r.Prs {
+				if peer != r.id {
+					r.msgs = append(r.msgs, pb.Message{
+						From:    r.id,
+						To:      peer,
+						Term:    r.Term,
+						MsgType: pb.MessageType_MsgHeartbeat,
+					})
+				}
+			}
 		}
 
 	}
