@@ -27,6 +27,7 @@ package raft
 
 import (
 	"fmt"
+	"github.com/pingcap-incubator/tinykv/log"
 	"reflect"
 	"sort"
 	"testing"
@@ -51,6 +52,7 @@ func TestLeaderUpdateTermFromMessage2AA(t *testing.T) {
 // Reference: section 5.1
 func testUpdateTermFromMessage(t *testing.T, state StateType) {
 	r := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
+	log.Info(state)
 	switch state {
 	case StateFollower:
 		r.becomeFollower(1, 2)
@@ -130,6 +132,7 @@ func testNonleaderStartElection(t *testing.T, state StateType) {
 	// election timeout
 	et := 10
 	r := newTestRaft(1, []uint64{1, 2, 3}, et, 1, NewMemoryStorage())
+	log.Info(state)
 	switch state {
 	case StateFollower:
 		r.becomeFollower(1, 2)
@@ -288,13 +291,14 @@ func testNonleaderElectionTimeoutRandomized(t *testing.T, state StateType) {
 		}
 
 		time := 0
+		// 如果有消息则结束循环
 		for len(r.readMessages()) == 0 {
 			r.tick()
 			time++
 		}
 		timeouts[time] = true
 	}
-
+	// 11-19 = true
 	for d := et + 1; d < 2*et; d++ {
 		if !timeouts[d] {
 			t.Errorf("timeout in %d ticks should happen", d)
