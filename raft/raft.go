@@ -330,11 +330,9 @@ func (r *Raft) Step(m pb.Message) error {
 			var reject bool
 			if r.Vote == None {
 				r.Vote = m.From
-				r.votes[r.id] = true
 				reject = false
 			} else if r.Vote == m.From {
 				r.Vote = m.From
-				r.votes[m.From] = true
 				reject = false
 			} else {
 				reject = true
@@ -370,7 +368,6 @@ func (r *Raft) Step(m pb.Message) error {
 				r.becomeLeader()
 			}
 		case pb.MessageType_MsgRequestVote:
-			r.votes[m.From] = true
 			flag := false
 			if r.Vote == None {
 				r.Vote = m.From
@@ -398,11 +395,9 @@ func (r *Raft) Step(m pb.Message) error {
 			var reject bool
 			if r.Vote == None {
 				r.Vote = m.From
-				r.votes[r.id] = true
 				reject = false
 			} else if r.Vote == m.From {
 				r.Vote = m.From
-				r.votes[m.From] = true
 				reject = false
 			} else {
 				reject = true
