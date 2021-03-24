@@ -368,13 +368,16 @@ func (r *Raft) Step(m pb.Message) error {
 				r.becomeLeader()
 			}
 		case pb.MessageType_MsgRequestVote:
+			if m.Term > r.Term {
+				r.becomeFollower(m.Term, m.From)
+			}
 			flag := false
 			if r.Vote == None {
 				r.Vote = m.From
 			} else {
 				flag = true
 			}
-			r.becomeFollower(m.Term, m.From)
+			//r.becomeFollower(m.Term, m.From)
 			//if len(r.votes) >= (len(r.Prs)+1)/2+1 {
 			//	r.becomeLeader()
 			r.msgs = []pb.Message{
