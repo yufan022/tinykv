@@ -368,26 +368,32 @@ func (r *Raft) Step(m pb.Message) error {
 				r.becomeLeader()
 			}
 		case pb.MessageType_MsgRequestVote:
+			flag := true
 			if m.Term > r.Term {
 				r.becomeFollower(m.Term, m.From)
-			}
-			flag := false
-			if r.Vote == None {
+				flag = false
 				r.Vote = m.From
-			} else {
-				flag = true
 			}
-			//r.becomeFollower(m.Term, m.From)
-			//if len(r.votes) >= (len(r.Prs)+1)/2+1 {
-			//	r.becomeLeader()
 			r.msgs = []pb.Message{
 				{From: r.id, To: m.From, Term: r.Term, MsgType: pb.MessageType_MsgRequestVoteResponse, Reject: flag},
 			}
 			//}
 		case pb.MessageType_MsgHeartbeat:
 			r.becomeFollower(m.Term, m.From)
-			//case pb.MessageType_MsgAppend:
-			//	r.becomeFollower(m.Term+1, m.From)
+		case pb.MessageType_MsgHup:
+			r.becomeCandidate()
+			if len(r.Prs) == 0 {
+				r.becomeLeader()
+			}
+			r.msgs = []pb.Message{}
+			for peer, _ := range r.Prs {
+				r.msgs = append(r.msgs, pb.Message{
+					From:    r.id,
+					To:      peer,
+					Term:    r.Term,
+					MsgType: pb.MessageType_MsgRequestVote,
+				})
+			}
 		}
 
 	case StateLeader:
